@@ -1,9 +1,12 @@
-const io = require('socket.io-client');
-const { createClient } = require('@supabase/supabase-js');
+const io = require("socket.io-client");
+require('dotenv').config();
+
+const { createClient } = require("@supabase/supabase-js");
+const { v4: uuidv4 } = require("uuid");
 
 // --- Supabase setup ---
-const supabaseUrl = 'https://nzsabxdvvtidiqqwyazk.supabase.co'; // your Supabase project URL
-const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im56c2FieGR2dnRpZGlxcXd5YXprIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTgxNjcwMDgsImV4cCI6MjA3Mzc0MzAwOH0.W1rN_qEnb4Z8oI0g7G4m3siuwBP0KUw35N9epfSn08Y'; // your Supabase key
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_KEY;
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 // --- Connect to the WebSocket ---
