@@ -11,6 +11,7 @@ from supabase import create_client, Client
 from openai import AzureOpenAI
 import logging
 from logging.handlers import RotatingFileHandler
+from sqlalchemy import create_engine
 
 load_dotenv()
 
@@ -704,7 +705,7 @@ class QueryExecutor:
             
             # Execute using direct PostgreSQL connection
             conn_string = self._get_postgres_connection_string()
-            from sqlalchemy import create_engine
+            
             
             engine = create_engine(conn_string)
 
@@ -730,7 +731,7 @@ class QueryExecutor:
                 "Please set SUPABASE_DB_HOST and SUPABASE_DB_PASSWORD in .env file"
             )
         
-        return f"postgresql://postgres:{db_password}@{db_host}:5432/postgres"
+        return f"postgresql://postgres.vkjyerqehgptpmgofxhs:{db_password}@aws-1-ap-southeast-1.pooler.supabase.com:6543/postgres"
 
 # =============================================================================
 # ENHANCED RESULT FORMATTER
