@@ -11,7 +11,6 @@ from supabase import create_client, Client
 from openai import AzureOpenAI
 import logging
 from logging.handlers import RotatingFileHandler
-from sqlalchemy import create_engine
 
 load_dotenv()
 
@@ -421,7 +420,7 @@ CRITICAL COLUMN MAPPING RULES:
 - s88_batch_control has: id, line_id, batch_mixing_tank_status, bottler_status, capper_status, temperature_controller, volume_control, soda_recipe, production_parameters, operator_interface_status, process_data, quality_data, safety_status, timestamp
 
 IMPORTANT NOTES:
-- Use 'location' not 'site' for production_lines filtering (Austin, Dallas, etc.)
+- Use 'location' not 'site' for production_lines filtering (Katunayake, Biyagama, etc.)
 - Use 'rejection_reason' not 'defect_type' in quality_control
 - For OEE data, you can use dashboard_metrics, asset_kpi_data, or mes_kpis tables
 - For batch/recipe data, use s88_batch_control table
@@ -438,14 +437,14 @@ CRITICAL RULES FOR CLEAN SQL:
 7. Use reasonable LIMIT values (1 for "current", 10-50 for lists)
 
 EXAMPLE PATTERNS:
-- "Current OEE for Line1 in Austin" →
+- "Current OEE for Line1 in Katunayake" →
   SELECT pl.line_name, dm.oee, dm.timestamp
   FROM production_lines pl
   JOIN dashboard_metrics dm ON pl.id = dm.line_id
-  WHERE pl.location = 'Austin'
+  WHERE pl.location = 'Katunayake'
   ORDER BY dm.timestamp DESC LIMIT 1
 
-- "Maintenance status in Dallas" →
+- "Maintenance status in Biyagama" →
     SELECT a.id AS asset_id, a.asset_name, a.line_id,
             mr.maintenance_status, mr.last_maintenance_date,
             mr.next_maintenance_date, mr.timestamp
@@ -581,10 +580,10 @@ Generate clean, executable SQL. Avoid unnecessary complexity."""
         line = None
         
         # Parse from question
-        if 'austin' in question_lower:
-            site = 'Austin'
-        elif 'dallas' in question_lower:
-            site = 'Dallas'
+        if 'Katunayake' in question_lower:
+            site = 'Katunayake'
+        elif 'Biyagama' in question_lower:
+            site = 'Biyagama'
         
         if 'press' in question_lower:
             area = 'Press'
@@ -705,7 +704,7 @@ class QueryExecutor:
             
             # Execute using direct PostgreSQL connection
             conn_string = self._get_postgres_connection_string()
-            
+            from sqlalchemy import create_engine
             
             engine = create_engine(conn_string)
 
@@ -731,7 +730,7 @@ class QueryExecutor:
                 "Please set SUPABASE_DB_HOST and SUPABASE_DB_PASSWORD in .env file"
             )
         
-        return f"postgresql://postgres.vkjyerqehgptpmgofxhs:{db_password}@aws-1-ap-southeast-1.pooler.supabase.com:6543/postgres"
+        return f"postgresql://postgres:{db_password}@{db_host}:5432/postgres"
 
 # =============================================================================
 # ENHANCED RESULT FORMATTER
@@ -768,7 +767,7 @@ class EnhancedResultFormatter:
 I couldn't find any matching data for your query. Here are some suggestions:
 
 **Try these alternatives:**
-• Check if the specified location/line exists (e.g., "Austin", "Dallas", "Line1")
+• Check if the specified location/line exists (e.g., "Katunayake", "Biyagama", "Line1")
 • Expand your time range (e.g., "last week" instead of "last hour")
 • Ask about available data: "What sites are available?" or "Show recent OEE data"
 • Try a broader query: "Show current OEE for all lines"
@@ -1269,7 +1268,7 @@ def main():
         
         # Filters
         st.subheader("🔍 Filters")
-        filter_site = st.selectbox("Site", ["All", "Austin", "Dallas"])
+        filter_site = st.selectbox("Site", ["All", "Katunayake", "Biyagama"])
         filter_line = st.text_input("Line (e.g., Line1)")
         
         context = {}
@@ -1288,10 +1287,10 @@ def main():
         with col1:
             st.markdown("**📊 Data Queries:**")
             example_queries = [
-                "Current OEE in Austin",
+                "Current OEE in Katunayake",
                 "Show OEE trends last 24 hours",
                 "Which machines need maintenance?",
-                "Quality issues in Dallas Press",
+                "Quality issues in Biyagama Press",
             ]
             
             for query in example_queries:
