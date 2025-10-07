@@ -222,156 +222,121 @@ class SimpleSQLGenerator:
     def generate_maintenance_query(site: str = None, machine: str = None, 
                                 overdue_only: bool = False) -> Dict[str, Any]:
         """Generate maintenance query using correct schema with machine_id casting"""
-
+    
         where_conditions = []
-
+        
+        # Base condition for overdue maintenance
+        if overdue_only:
+            where_conditions.append("mr.next_maintenance_date < NOW()")
+            where_conditions.append("(mr.maintenance_status IS NULL OR LOWER(mr.maintenance_status) NOT IN ('completed', 'done'))")
+    
+        # Add site filter
         if site:
             clean_site = SimpleSQLGenerator.clean_value(site)
             where_conditions.append(f"pl.location = '{clean_site}'")
+        
+        # Add machine filter
         if machine:
             clean_machine = SimpleSQLGenerator.clean_value(machine)
             where_conditions.append(f"a.asset_name ILIKE '%{clean_machine}%'")
-        if overdue_only:
-            where_conditions.append("mr.next_maintenance_date < NOW()")
-
-        # Default condition to avoid syntax issues
+    
+        # Build WHERE clause - use 1=1 as default if no conditions
         where_clause = " AND ".join(where_conditions) if where_conditions else "1=1"
-
+    
+        # Include production_lines join if site filtering is needed
+        joins = """
+        FROM assets a
+        JOIN maintenance_records mr 
+            ON a.id = CAST(SUBSTRING(mr.machine_id FROM '[0-9]+') AS INTEGER)
+        """
+        
+        if site:
+            joins += "JOIN production_lines pl ON a.line_id = pl.id"
+    
         sql = f"""
         SELECT a.id AS asset_id, a.asset_name, a.line_id,
                mr.maintenance_status, mr.last_maintenance_date,
                mr.next_maintenance_date, mr.timestamp
-        FROM assets a
-        JOIN maintenance_records mr 
-            ON a.id = CAST(SUBSTRING(mr.machine_id FROM '[0-9]+') AS INTEGER)
-        WHERE mr.next_maintenance_date < NOW()
-        AND (mr.maintenance_status IS NULL OR LOWER(mr.maintenance_status) NOT IN ('completed', 'done'))
+        {joins}
+        WHERE {where_clause}
         ORDER BY mr.timestamp DESC
         LIMIT 1000;
         """
-
+    
         return {
             'sql': sql.strip(),
             'params': [],
             'explanation': f"Maintenance records for {machine or 'all machines'} in {site or 'all sites'}"
         }
-
-    
-    @staticmethod
-    def generate_quality_query(site: str = None, area: str = None, 
-                             time_filter: str = "24 hours") -> Dict[str, Any]:
-        """Generate quality metrics query using correct schema"""
         
-        where_conditions = []
+        @staticmethod
+        def generate_batch_control_query(recipe_filter: str = None, 
+                                       time_filter: str = "7 days") -> Dict[str, Any]:
+            """Generate S88 batch control query for soda recipes and production parameters"""
+            
+            where_conditions = []
+            where_conditions.append(f"bc.timestamp >= NOW() - INTERVAL '{time_filter}'")
+            
+            if recipe_filter:
+                clean_recipe = SimpleSQLGenerator.clean_value(recipe_filter)
+                where_conditions.append(f"bc.soda_recipe ILIKE '%{clean_recipe}%'")
+            
+            where_clause = " AND ".join(where_conditions)
+            
+            sql = f"""
+            SELECT 
+                pl.line_name,
+                pl.location,
+                bc.soda_recipe,
+                bc.production_parameters,
+                bc.batch_mixing_tank_status,
+                bc.bottler_status,
+                bc.capper_status,
+                bc.temperature_controller,
+                bc.volume_control,
+                bc.operator_interface_status,
+                bc.quality_data,
+                bc.safety_status,
+                bc.timestamp
+            FROM s88_batch_control bc
+            JOIN production_lines pl ON bc.line_id = pl.id
+            WHERE {where_clause}
+            ORDER BY bc.timestamp DESC
+            LIMIT 20
+            """
+            
+            return {
+                'sql': sql.strip(),
+                'params': [],
+                'explanation': f'Batch control data for {recipe_filter or "all recipes"} in last {time_filter}'
+            }
         
-        # Use correct column names - quality_control has rejection_reason not defect_type
-        if site:
-            clean_site = SimpleSQLGenerator.clean_value(site)
-            where_conditions.append(f"pl.location = '{clean_site}'")
-        
-        # For area filtering, need to join with assets table
-        joins = "FROM quality_control qc JOIN production_lines pl ON qc.line_id = pl.id"
-        area_column = ""
-        if area:
-            clean_area = SimpleSQLGenerator.clean_value(area)
-            joins += " JOIN assets a ON a.line_id = pl.id"
-            where_conditions.append(f"a.area = '{clean_area}'")
-            area_column = "a.area,"
-        
-        where_conditions.append(f"qc.timestamp >= NOW() - INTERVAL '{time_filter}'")
-        
-        where_clause = " AND ".join(where_conditions)
-        
-        sql = f"""
-        SELECT 
-            pl.line_name,
-            pl.location,
-            {area_column}
-            qc.item_number,
-            qc.rejection_reason,
-            qc.rejection_quantity,
-            qc.accepted_quantity,
-            qc.timestamp
-        {joins}
-        WHERE {where_clause}
-        ORDER BY qc.rejection_quantity DESC
-        LIMIT 20
-        """
-        
-        return {
-            'sql': sql.strip(),
-            'params': [],
-            'explanation': f'Quality issues for last {time_filter} in {site or "all sites"}'
-        }
-    
-    @staticmethod
-    def generate_batch_control_query(recipe_filter: str = None, 
-                                   time_filter: str = "7 days") -> Dict[str, Any]:
-        """Generate S88 batch control query for soda recipes and production parameters"""
-        
-        where_conditions = []
-        where_conditions.append(f"bc.timestamp >= NOW() - INTERVAL '{time_filter}'")
-        
-        if recipe_filter:
-            clean_recipe = SimpleSQLGenerator.clean_value(recipe_filter)
-            where_conditions.append(f"bc.soda_recipe ILIKE '%{clean_recipe}%'")
-        
-        where_clause = " AND ".join(where_conditions)
-        
-        sql = f"""
-        SELECT 
-            pl.line_name,
-            pl.location,
-            bc.soda_recipe,
-            bc.production_parameters,
-            bc.batch_mixing_tank_status,
-            bc.bottler_status,
-            bc.capper_status,
-            bc.temperature_controller,
-            bc.volume_control,
-            bc.operator_interface_status,
-            bc.quality_data,
-            bc.safety_status,
-            bc.timestamp
-        FROM s88_batch_control bc
-        JOIN production_lines pl ON bc.line_id = pl.id
-        WHERE {where_clause}
-        ORDER BY bc.timestamp DESC
-        LIMIT 20
-        """
-        
-        return {
-            'sql': sql.strip(),
-            'params': [],
-            'explanation': f'Batch control data for {recipe_filter or "all recipes"} in last {time_filter}'
-        }
-    
-    @staticmethod
-    def generate_item_rejection_query(time_filter: str = "30 days") -> Dict[str, Any]:
-        """Generate query for item numbers with highest rejection quantities"""
-        
-        sql = f"""
-        SELECT 
-            qc.item_number,
-            pl.line_name,
-            pl.location,
-            qc.rejection_reason,
-            SUM(qc.rejection_quantity) as total_rejection_quantity,
-            SUM(qc.accepted_quantity) as total_accepted_quantity,
-            COUNT(*) as rejection_incidents
-        FROM quality_control qc
-        JOIN production_lines pl ON qc.line_id = pl.id
-        WHERE qc.timestamp >= NOW() - INTERVAL '{time_filter}'
-        GROUP BY qc.item_number, pl.line_name, pl.location, qc.rejection_reason
-        ORDER BY total_rejection_quantity DESC
-        LIMIT 20
-        """
-        
-        return {
-            'sql': sql.strip(),
-            'params': [],
-            'explanation': f'Items with highest rejection quantities in last {time_filter}'
-        }
+        @staticmethod
+        def generate_item_rejection_query(time_filter: str = "30 days") -> Dict[str, Any]:
+            """Generate query for item numbers with highest rejection quantities"""
+            
+            sql = f"""
+            SELECT 
+                qc.item_number,
+                pl.line_name,
+                pl.location,
+                qc.rejection_reason,
+                SUM(qc.rejection_quantity) as total_rejection_quantity,
+                SUM(qc.accepted_quantity) as total_accepted_quantity,
+                COUNT(*) as rejection_incidents
+            FROM quality_control qc
+            JOIN production_lines pl ON qc.line_id = pl.id
+            WHERE qc.timestamp >= NOW() - INTERVAL '{time_filter}'
+            GROUP BY qc.item_number, pl.line_name, pl.location, qc.rejection_reason
+            ORDER BY total_rejection_quantity DESC
+            LIMIT 20
+            """
+            
+            return {
+                'sql': sql.strip(),
+                'params': [],
+                'explanation': f'Items with highest rejection quantities in last {time_filter}'
+            }
 
 # =============================================================================
 # IMPROVED NATURAL LANGUAGE TO SQL TRANSLATOR
