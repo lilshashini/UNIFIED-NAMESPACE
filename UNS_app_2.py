@@ -1435,7 +1435,7 @@ def main():
         st.session_state.session_id = str(uuid.uuid4())[:8]
         logger.info(f"New session: {st.session_state.session_id}")
     
-    st.title("🏭 AME AlthinectIntelligence Agent")
+    st.title("🏭 AME Althinect Intelligence Agent")
     st.markdown("**Clean SQL Generation • Better Insights • Enhanced Visualizations**")
     
     # Initialize clients
