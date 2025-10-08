@@ -156,6 +156,74 @@ class SimpleSQLGenerator:
     """Generates clean, simple SQL queries without unnecessary complexity"""
     
     @staticmethod
+    def generate_factory_overview_query() -> Dict[str, Any]:
+        """Generate comprehensive factory overview query"""
+        
+        sql = """
+       SELECT 
+        pl.location AS factory_location,
+        pl.business_unit AS division,
+        COALESCE(a.area, 'General') AS area,
+        pl.line_name,
+        ROUND(COALESCE(lm.availability,0)::numeric, 2) AS availability,
+        ROUND(COALESCE(lm.quality,0)::numeric, 2) AS quality,
+        ROUND(COALESCE(lm.performance,0)::numeric, 2) AS performance,
+        ROUND(COALESCE(lm.oee,0)::numeric, 2) AS oee,
+        lo.order_number,
+        lo.item_number,
+        TO_CHAR(lo.scheduled_end_time, 'Month DD, YYYY') AS scheduled_end_time,
+        lo.produced_quantity,
+        lo.remaining_quantity,
+        lo.order_status,
+        lq.inspection_result,
+        lq.rejection_reason,
+        lq.rejection_quantity
+    FROM production_lines pl
+    LEFT JOIN assets a ON a.line_id = pl.id
+    LEFT JOIN LATERAL (
+        SELECT dm.*
+        FROM dashboard_metrics dm
+        WHERE dm.line_id = pl.id
+        ORDER BY dm.timestamp DESC
+        LIMIT 1
+    ) lm ON TRUE
+    LEFT JOIN LATERAL (
+        SELECT eo.*
+        FROM erp_orders eo
+        WHERE eo.line_id = pl.id
+        AND (eo.order_status IS NULL OR eo.order_status != 'Completed')
+        ORDER BY eo.scheduled_end_time DESC
+        LIMIT 1
+    ) lo ON TRUE
+    LEFT JOIN LATERAL (
+        SELECT qc.*
+        FROM quality_control qc
+        WHERE qc.line_id = pl.id
+        AND qc.inspection_result IS NOT NULL
+        ORDER BY qc.timestamp DESC
+        LIMIT 1
+    ) lq ON TRUE
+    WHERE 
+        pl.location IS NOT NULL
+        AND pl.line_name IS NOT NULL
+        AND (lm.oee IS NOT NULL OR lo.order_number IS NOT NULL)
+    ORDER BY 
+        pl.location,
+        pl.business_unit,
+        area,
+        pl.line_name;
+
+        """
+        
+        return {
+            'sql': sql.strip(),
+            'params': [],
+            'explanation': 'Comprehensive factory overview with OEE, orders, and quality data',
+            'is_factory_overview': True
+        }
+
+    
+    @staticmethod
     def clean_value(value: str) -> str:
         """Clean and normalize string values"""
         if not value:
@@ -269,8 +337,10 @@ class SimpleSQLGenerator:
             'explanation': f"Maintenance records for {machine or 'all machines'} in {site or 'all sites'}"
         }
         
-        @staticmethod
-        def generate_batch_control_query(recipe_filter: str = None, 
+    
+    
+    @staticmethod
+    def generate_batch_control_query(recipe_filter: str = None, 
                                        time_filter: str = "7 days") -> Dict[str, Any]:
             """Generate S88 batch control query for soda recipes and production parameters"""
             
@@ -309,10 +379,13 @@ class SimpleSQLGenerator:
                 'sql': sql.strip(),
                 'params': [],
                 'explanation': f'Batch control data for {recipe_filter or "all recipes"} in last {time_filter}'
-            }
+            }    
+    
+    
+    
         
-        @staticmethod
-        def generate_item_rejection_query(time_filter: str = "30 days") -> Dict[str, Any]:
+    @staticmethod
+    def generate_item_rejection_query(time_filter: str = "30 days") -> Dict[str, Any]:
             """Generate query for item numbers with highest rejection quantities"""
             
             sql = f"""
@@ -337,6 +410,8 @@ class SimpleSQLGenerator:
                 'params': [],
                 'explanation': f'Items with highest rejection quantities in last {time_filter}'
             }
+            
+            
 
 # =============================================================================
 # IMPROVED NATURAL LANGUAGE TO SQL TRANSLATOR
@@ -409,6 +484,36 @@ EXAMPLE PATTERNS:
   JOIN dashboard_metrics dm ON pl.id = dm.line_id
   WHERE pl.location = 'Katunayake'
   ORDER BY dm.timestamp DESC LIMIT 1
+  
+  
+- "Tell me about our factory/factories" →  
+SELECT 
+    pl.location AS factory_location,
+    pl.business_unit AS division,
+    pl.line_name,
+    lm.oee,
+    lm.availability,
+    lm.performance,
+    lm.quality
+FROM production_lines pl
+LEFT JOIN LATERAL (
+    SELECT dm.oee, dm.availability, dm.performance, dm.quality
+    FROM dashboard_metrics dm
+    WHERE dm.line_id = pl.id
+    ORDER BY dm.timestamp DESC
+    LIMIT 1
+) lm ON TRUE
+WHERE pl.location IN ('Biyagama', 'Katunayake')
+ORDER BY 
+    pl.location,
+    pl.business_unit,
+    pl.line_name;
+
+
+
+
+
+
 
 - "Maintenance status in Biyagama" →
     SELECT a.id AS asset_id, a.asset_name, a.line_id,
@@ -540,21 +645,30 @@ Generate clean, executable SQL. Avoid unnecessary complexity."""
         """Simple fallback parser"""
         question_lower = question.lower()
         
+        overview_keywords = ['tell me about', 'overview', 'factory summary', 'factory status', 
+                        'our factory', 'all lines', 'entire factory', 'complete picture',
+                        'factory performance', 'all operations']
+        
+        if any(keyword in question_lower for keyword in overview_keywords):
+            return SimpleSQLGenerator.generate_factory_overview_query()
+        
         # Extract context
         site = context.get('site') if context else None
         area = None
         line = None
         
         # Parse from question
-        if 'Katunayake' in question_lower:
+        if 'katunayake' in question_lower:
             site = 'Katunayake'
-        elif 'Biyagama' in question_lower:
+        elif 'biyagama' in question_lower:
             site = 'Biyagama'
         
         if 'press' in question_lower:
             area = 'Press'
         elif 'assembly' in question_lower:
             area = 'Assembly'
+        elif 'heat treat' in question_lower:
+            area = 'Heat Treat'
         
         line_match = re.search(r'line\s*(\d+)', question_lower)
         if line_match:
@@ -704,6 +818,128 @@ class QueryExecutor:
 
 class EnhancedResultFormatter:
     """Formats query results with better insights"""
+    
+    def format_factory_overview(self, df: Any) -> str:
+        """Format comprehensive factory overview with detailed insights"""
+        
+        if df is None or df.empty:
+            return "No factory data available."
+        
+        text = "# 🏭 **Factory Overview**\n\n"
+        
+        # Group by location and area
+        for location in df['location'].unique():
+            if pd.isna(location):
+                continue
+                
+            location_data = df[df['location'] == location]
+            text += f"## 📍 **{location} Site**\n\n"
+            
+            # Group by area (division)
+            areas = location_data['area'].dropna().unique()
+            
+            for area in areas:
+                area_data = location_data[location_data['area'] == area]
+                text += f"### **{area} Division**\n\n"
+                
+                # Process each line
+                for _, row in area_data.iterrows():
+                    line_name = row.get('line_name', 'Unknown Line')
+                    text += f"**{line_name}:**\n\n"
+                    
+                    # OEE Metrics
+                    if pd.notna(row.get('oee')):
+                        oee = row['oee']
+                        availability = row.get('availability', 0)
+                        quality = row.get('quality', 0)
+                        performance = row.get('performance', 0)
+                        
+                        # Performance indicator
+                        if oee >= 60:
+                            indicator = "🟢"
+                        elif oee >= 40:
+                            indicator = "🟡"
+                        else:
+                            indicator = "🔴"
+                        
+                        text += f"- {indicator} **Availability:** {availability:.0f}%\n"
+                        text += f"- {indicator} **Quality:** {quality:.0f}%\n"
+                        text += f"- {indicator} **Performance:** {performance:.0f}%\n"
+                        text += f"- {indicator} **OEE:** {oee:.0f}%\n\n"
+                    
+                    # Current Orders
+                    if pd.notna(row.get('order_number')):
+                        text += f"**Current Order:**\n"
+                        text += f"- Item Number: {row['item_number']}\n"
+                        text += f"- Produced: {row.get('produced_quantity', 0):.0f} units\n"
+                        text += f"- Remaining: {row.get('remaining_quantity', 0):.0f} units\n"
+                        
+                        if pd.notna(row.get('scheduled_end_time')):
+                            end_time = pd.to_datetime(row['scheduled_end_time'])
+                            text += f"- Scheduled End: {end_time.strftime('%B %d, %Y')}\n\n"
+                    
+                    # Quality Issues
+                    if pd.notna(row.get('inspection_result')) and row['inspection_result'].lower() == 'fail':
+                        text += f"⚠️ **Quality Alert:**\n"
+                        text += f"- Status: Inspection Failed\n"
+                        text += f"- Rejection Quantity: {row.get('rejection_quantity', 0):.0f} items\n"
+                        
+                        if pd.notna(row.get('rejection_reason')):
+                            text += f"- Reason: {row['rejection_reason']}\n"
+                        
+                        if pd.notna(row.get('qc_item_number')):
+                            text += f"- Item: {row['qc_item_number']}\n"
+                        
+                        text += "\n"
+                    
+                    text += "---\n\n"
+        
+        # Summary insights
+        text += "## 📊 **Key Insights**\n\n"
+        
+        # Calculate overall metrics
+        avg_oee = df['oee'].mean()
+        avg_availability = df['availability'].mean()
+        avg_performance = df['performance'].mean()
+        avg_quality = df['quality'].mean()
+        
+        text += f"- **Overall Factory OEE:** {avg_oee:.1f}%\n"
+        text += f"- **Average Availability:** {avg_availability:.1f}%\n"
+        text += f"- **Average Performance:** {avg_performance:.1f}%\n"
+        text += f"- **Average Quality:** {avg_quality:.1f}%\n\n"
+        
+        # Identify problem areas
+        low_oee_lines = df[df['oee'] < 40]
+        if not low_oee_lines.empty:
+            text += "⚠️ **Lines Requiring Attention:**\n"
+            for _, line in low_oee_lines.iterrows():
+                text += f"- {line['line_name']} (OEE: {line['oee']:.0f}%)\n"
+            text += "\n"
+        
+        # Quality issues
+        failed_inspections = df[df['inspection_result'].str.lower() == 'fail'] if 'inspection_result' in df.columns else pd.DataFrame()
+        if not failed_inspections.empty:
+            total_rejections = failed_inspections['rejection_quantity'].sum()
+            text += f"🔍 **Quality Concerns:** {len(failed_inspections)} lines with failed inspections\n"
+            text += f"- Total Rejection Quantity: {total_rejections:.0f} items\n\n"
+        
+        # Recommendations
+        text += "## 💡 **Recommendations**\n\n"
+        
+        if avg_availability < 80:
+            text += "- Focus on improving equipment availability through preventive maintenance\n"
+        
+        if avg_performance < 80:
+            text += "- Analyze cycle times and address bottlenecks to improve performance\n"
+        
+        if avg_quality < 90:
+            text += "- Implement enhanced quality control measures to reduce rejection rates\n"
+        
+        if not failed_inspections.empty:
+            text += "- Investigate root causes of quality failures and implement corrective actions\n"
+        
+        return text
+    
     
     def __init__(self, azure_client: Optional[AzureOpenAI] = None):
         self.azure_client = azure_client
@@ -1199,7 +1435,7 @@ def main():
         st.session_state.session_id = str(uuid.uuid4())[:8]
         logger.info(f"New session: {st.session_state.session_id}")
     
-    st.title("🏭 Manufacturing Data Chatbot")
+    st.title("🏭 AME AlthinectIntelligence Agent")
     st.markdown("**Clean SQL Generation • Better Insights • Enhanced Visualizations**")
     
     # Initialize clients
@@ -1357,15 +1593,29 @@ def main():
                     with st.spinner("⚙️ Executing query..."):
                         df, error = executor.execute(sql)
                     
-                    if error:
-                        error_msg = f"❌ {error}"
-                        st.error(error)
-                        st.session_state.messages.append({
+                    if translation.get('is_factory_overview'):
+                        # Use special factory overview formatting
+                        insights = formatter.format_factory_overview(df)
+                        st.markdown(insights)
+                        
+                        # Show data table
+                        if df is not None and not df.empty:
+                            with st.expander(f"📊 View Raw Data ({len(df)} rows)"):
+                                st.dataframe(df, use_container_width=True)
+                        
+                        # Save to history
+                        message_data = {
                             "role": "assistant",
-                            "content": error_msg,
+                            "content": insights,
                             "sql": sql
-                        })
+                        }
+                        
+                        if df is not None and not df.empty:
+                            message_data["dataframe"] = df
+                        
+                        st.session_state.messages.append(message_data)
                     else:
+                        
                         # Format results with insights
                         insights = formatter.format_to_text(df, prompt, explanation)
                         st.markdown(insights)
