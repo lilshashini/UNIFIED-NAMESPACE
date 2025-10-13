@@ -2809,10 +2809,10 @@ def main():
     st.title("🏭 AME Althinect Intelligence Agent")
     col1, col2 = st.columns([1, 16])
     with col1:
-        st.image("logo.png", width=120)
+        st.image("logo.png", width=150)
     with col2:
         st.markdown(
-            "<h2 style='font-size:28px; transform: translateY(-8px); margin:0;'> Factory Copilot</h2>",
+            "<h2 style='font-size:25px; transform: translateY(-9px); margin:0;'> Factory Copilot</h2>",
             unsafe_allow_html=True
             )
     
