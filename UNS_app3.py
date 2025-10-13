@@ -2807,7 +2807,14 @@ def main():
         logger.info(f"New session: {st.session_state.session_id}")
     
     st.title("🏭 AME Althinect Intelligence Agent")
-    st.markdown("**teejay Factory Copilot**")
+    col1, col2 = st.columns([1, 16])
+    with col1:
+        st.image("logo.png", width=120)
+    with col2:
+        st.markdown(
+            "<h2 style='font-size:28px; transform: translateY(-8px); margin:0;'> Factory Copilot</h2>",
+            unsafe_allow_html=True
+            )
     
     # Initialize clients
     supabase, azure_client = init_clients()
