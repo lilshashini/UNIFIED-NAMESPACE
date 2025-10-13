@@ -2807,7 +2807,7 @@ def main():
         logger.info(f"New session: {st.session_state.session_id}")
     
     st.title("🏭 AME Althinect Intelligence Agent")
-    st.markdown("**Clean SQL Generation • Better Insights • Enhanced Visualizations**")
+    st.markdown("**teejay Factory Copilot**")
     
     # Initialize clients
     supabase, azure_client = init_clients()
