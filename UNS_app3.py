@@ -1320,7 +1320,7 @@ class QueryExecutor:
                 "Please set SUPABASE_DB_HOST and SUPABASE_DB_PASSWORD in .env file"
             )
         
-        return f"postgresql://postgres.towvxctyflaxtpfzvxqc:{db_password}@aws-1-ap-southeast-1.pooler.supabase.com:6543/postgres"
+        return f"postgresql://postgres.towvxctyflaxtpfzvxqc:{db_password}@aws-1-ap-south-1.pooler.supabase.com:6543/postgres"
         
 
 # =============================================================================
