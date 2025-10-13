@@ -1320,20 +1320,7 @@ class QueryExecutor:
                 "Please set SUPABASE_DB_HOST and SUPABASE_DB_PASSWORD in .env file"
             )
         
-        # Handle different Supabase connection formats
-        if "pooler.supabase.com" in db_host:
-            if db_host.startswith("postgresql://"):
-                # Full connection string provided
-                return db_host
-            elif "aws-1-ap-southeast-1.pooler.supabase.com" in db_host:
-                # Specific pooler format
-                return f"postgresql://postgres.towvxctyflaxtpfzvxqc:{db_password}@{db_host}:6543/postgres"
-            else:
-                # General pooler format
-                return f"postgresql://postgres:{db_password}@{db_host}:6543/postgres"
-        else:
-            # Standard PostgreSQL format
-            return f"postgresql://postgres:{db_password}@{db_host}:5432/postgres"
+        return f"postgresql://postgres.towvxctyflaxtpfzvxqc:{db_password}@aws-1-ap-southeast-1.pooler.supabase.com:6543/postgres"
         
 
 # =============================================================================
