@@ -2807,7 +2807,7 @@ def main():
         logger.info(f"New session: {st.session_state.session_id}")
     
     st.title("🏭 Factory Intelligence Agent")
-    col1, col2 = st.columns([1, 16])
+    col1, col2 = st.columns([2, 16])
     with col1:
         st.image("logo.png", width=350)
     with col2:
