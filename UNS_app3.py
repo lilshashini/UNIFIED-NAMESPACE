@@ -2807,9 +2807,9 @@ def main():
         logger.info(f"New session: {st.session_state.session_id}")
     
     st.title("🏭 Factory Intelligence Agent")
-    col1, col2 = st.columns([2, 16])
+    col1, col2 = st.columns([2, 20])
     with col1:
-        st.image("logo.png", width=100)
+        st.image("logo.png", width=150)
     with col2:
         st.markdown(
             "<h2 style='font-size:23px; transform: translateY(-18px); margin:0;'> Factory Copilot</h2>",
