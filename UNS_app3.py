@@ -2809,7 +2809,7 @@ def main():
     st.title("🏭 Factory Intelligence Agent")
     col1, col2 = st.columns([2, 20])
     with col1:
-        st.image("logo.png", width=120)
+        st.image("Hayleys_Fabric_logo.png", width=120)
     with col2:
         st.markdown(
             "<h2 style='font-size:23px; transform: translateY(-10px) translateX(-22px); margin:0;'> Factory Copilot</h2>",
