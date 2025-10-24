@@ -2812,7 +2812,7 @@ def main():
         st.image("Jay_jay_mills_logo.png", width=200)
     with col2:
         st.markdown(
-            "<h2 style='font-size:23px; transform: translateY(-31px) translateX(-12px); margin:0;'> Factory Copilot</h2>",
+            "<h2 style='font-size:23px; transform: translateY(-22px) translateX(-12px); margin:0;'> Factory Copilot</h2>",
             unsafe_allow_html=True
             )
     
